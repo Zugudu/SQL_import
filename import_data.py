@@ -2,6 +2,7 @@ import mysql.connector
 from dbconfig import DB
 
 from sys import stdout
+from datetime import datetime
 
 import import_config
 import os
@@ -9,7 +10,8 @@ import re
 import json
 
 
-jsn1 = os.path.join(os.getcwd(), 'jsn1')
+jsn1 = os.path.join(os.getcwd(), import_config.json)
+log_file = os.path.join(os.getcwd(), import_config.log_file)
 sql_client = mysql.connector.connect(**DB)
 
 
@@ -20,6 +22,16 @@ def check_contains(dict, lang):
 		if lang in dict['audio'].keys():
 			return True
 	return False
+
+
+def log(data):
+	try:
+		with open(log_file, 'a+') as fd:
+			fd.write(data)
+			fd.write('\n')
+	except Exception as ex:
+		print('E: Some unexceptional error in file', file, '-', ex)
+	return data
 
 
 def object_handler(record, file, word):
@@ -58,7 +70,6 @@ def object_handler(record, file, word):
 	if parent:
 		parent = str(parent)
 
-	# print(w)  # TODO REMOVE
 	cursor = sql_client.cursor()
 	cursor.execute('SELECT COUNT(*) FROM {} WHERE word=%s;'.format(import_config.words), (w,))
 	if cursor.fetchone()[0] == 0:
@@ -93,6 +104,11 @@ if __name__ == '__main__':
 	if not os.path.isdir(jsn1):
 		print('jsn1 is not a directory!')
 		exit(1)
+	if os.path.exists(log_file) and os.path.isdir(log_file):
+		print('Log file cannot be a directory!')
+		exit(1)
+
+	log('Started in {}'.format(datetime.now().strftime('%x %X')))
 
 	try:
 		correct_name = '.*v(ru|uk|pl)\.json$'
@@ -117,11 +133,14 @@ if __name__ == '__main__':
 						print('W: File', file, "doesn't contains json dictionary!")
 
 			except FileNotFoundError:
-				print('E: File', file, "doesn't exist!")
+				err_msg = "E: File {} doesn't exist!".format(file)
+				print(log(err_msg))
 			except json.decoder.JSONDecodeError:
-				print('W: File', file, 'is corrupted')
+				err_msg = 'W: File {} is corrupted'.format(file)
+				print(log(err_msg))
 			except Exception as ex:
-				print('E: Some unexceptional error in file', file, '-', ex)
+				err_msg = 'E: Some unexceptional error in file {} - {}'.format(file, ex)
+				print(log(err_msg))
 	except KeyboardInterrupt:
 		print('Stop by user!')
 	finally:
