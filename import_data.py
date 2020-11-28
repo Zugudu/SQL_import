@@ -1,5 +1,9 @@
 import mysql.connector
 from dbconfig import DB
+
+from sys import stdout
+
+import import_config
 import os
 import re
 import json
@@ -54,20 +58,30 @@ def object_handler(record, file, word):
 	if parent:
 		parent = str(parent)
 
-	print(w)  # TODO REMOVE
+	# print(w)  # TODO REMOVE
 	cursor = sql_client.cursor()
-	cursor.execute('SELECT COUNT(*) FROM words WHERE word=%s;', (w,))
+	cursor.execute('SELECT COUNT(*) FROM {} WHERE word=%s;'.format(import_config.words), (w,))
 	if cursor.fetchone()[0] == 0:
-		cursor.execute('INSERT INTO words (word, parent, gb, us , reserved) VALUES(%s, %s, %s, %s, %s);',
+		# INFO
+		print(w, end=' ')
+		stdout.flush()
+
+		cursor.execute('INSERT INTO {} (word, parent, gb, us , reserved) VALUES(%s, %s, %s, %s, %s);'
+						.format(import_config.words),
 						(w, parent, gb_lang, us_lang, file))
 		sql_client.commit()
 
-	cursor.execute('SELECT idkey FROM words WHERE word=%s;', (w,))
+	cursor.execute('SELECT idkey FROM {} WHERE word=%s;'.format(import_config.words), (w,))
 	id = cursor.fetchone()[0]
 
-	cursor.execute('SELECT COUNT(*) FROM translates WHERE idkey=%s AND lang=%s;', (id, origin_lang))
+	cursor.execute('SELECT COUNT(*) FROM {} WHERE idkey=%s AND lang=%s;'.format(import_config.translates),
+					(id, origin_lang))
 	if cursor.fetchone()[0] == 0:
-		cursor.execute('INSERT INTO translates VALUES(NULL, %s, %s, %s, %s, %s, %s);',
+		# INFO
+		print('[{}]'.format(w), end=' ')
+		stdout.flush()
+
+		cursor.execute('INSERT INTO {} VALUES(NULL, %s, %s, %s, %s, %s, %s);'.format(import_config.translates),
 					(id, w, origin_lang, record.get('wforms', None), record.get('trans', None), file))
 		sql_client.commit()
 
@@ -91,9 +105,14 @@ if __name__ == '__main__':
 				with open(os.path.join(jsn1, file), encoding='utf-8') as fd:
 					data = json.load(fd)
 					if isinstance(data, dict):
+						# INFO
+						print('\r', file, end=': ')
+						stdout.flush()
+
 						for W in data.keys():
 							if check_contains(data[W], 'gb') or check_contains(data[W], 'us'):
 								object_handler(data[W], file, W)
+						print('\n')
 					else:
 						print('W: File', file, "doesn't contains json dictionary!")
 
