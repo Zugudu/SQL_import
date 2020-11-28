@@ -24,7 +24,7 @@ def object_handler(record, file, word):
 		w = w.replace(el, "'")
 
 	us_lang = None
-	gb_land = None
+	gb_lang = None
 
 	if check_contains(record, 'us'):
 		if 'us' in record.keys():
@@ -72,7 +72,6 @@ def object_handler(record, file, word):
 		sql_client.commit()
 
 	sql_client.close()
-	#print(file, word, w, lang, record)  # TODO REMOVE
 
 
 if __name__ == '__main__':
@@ -102,10 +101,10 @@ if __name__ == '__main__':
 
 			except FileNotFoundError:
 				print('E: File', file, "doesn't exist!")
-			# except json.decoder.JSONDecodeError:
-			# 	print('W: File', file, 'is corrupted')
-			# except Exception as ex:
-			# 	print('E: Some unexceptional error in file', file, '-', ex)
+			except json.decoder.JSONDecodeError:
+				print('W: File', file, 'is corrupted')
+			except Exception as ex:
+				print('E: Some unexceptional error in file', file, '-', ex)
 	except KeyboardInterrupt:
 		print('Stop by user!')
 		exit(0)
