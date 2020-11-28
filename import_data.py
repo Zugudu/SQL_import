@@ -6,6 +6,7 @@ import json
 
 
 jsn1 = os.path.join(os.getcwd(), 'jsn1')
+sql_client = mysql.connector.connect(**DB)
 
 
 def check_contains(dict, lang):
@@ -54,7 +55,6 @@ def object_handler(record, file, word):
 		parent = str(parent)
 
 	print(w)  # TODO REMOVE
-	sql_client = mysql.connector.connect(**DB)
 	cursor = sql_client.cursor()
 	cursor.execute('SELECT COUNT(*) FROM words WHERE word=%s;', (w,))
 	if cursor.fetchone()[0] == 0:
@@ -70,8 +70,6 @@ def object_handler(record, file, word):
 		cursor.execute('INSERT INTO translates VALUES(NULL, %s, %s, %s, %s, %s, %s);',
 					(id, w, origin_lang, record.get('wforms', None), record.get('trans', None), file))
 		sql_client.commit()
-
-	sql_client.close()
 
 
 if __name__ == '__main__':
@@ -107,4 +105,6 @@ if __name__ == '__main__':
 				print('E: Some unexceptional error in file', file, '-', ex)
 	except KeyboardInterrupt:
 		print('Stop by user!')
+	finally:
+		sql_client.close()
 		exit(0)
