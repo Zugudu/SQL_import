@@ -35,35 +35,74 @@ def log(data):
 
 
 def object_handler(record, file, word):
+	def get_lang_data(row, lang):
+		ret = None
+		if check_contains(row, lang):
+			if lang in row.keys():
+				if 'audio' in row.keys():
+					if lang in row['audio'].keys():
+						ret = '{"1":{"' + lang + '":"' + str(row[lang]) + '","audio":' + str(
+							row['audio']) + '}}'
+				else:
+					ret = '{"1":{"' + lang + '":"' + str(row[lang]) + '"}}'
+			else:
+				ret = '{"1":{"audio":' + str(row['audio']) + '}}'
+		return ret
+
+	def reserved_write(row, mes):
+		res = row[6]
+		res += mes
+		cursor.execute(
+			'UPDATE {} SET reserved=%s WHERE idkey=%s;'.format(import_config.words),
+			(res, row[0]))
+		sql_client.commit()
+		cursor.execute('SELECT * FROM {} WHERE word=%s;'.format(import_config.words), (w,))
+		return cursor.fetchone()
+
+	def lang_mod(row, row_num, lang_id, lang):
+		if row[row_num] and row[row_num] != '':
+			if row[row_num] != lang:
+				lang_data = None
+				try:
+					lang_data = json.loads(row[row_num])["1"]
+				except json.decoder.JSONDecodeError:
+					print(log('In word "{}" {} row have corrupted JSON. Spotted when work with file "{}"'.format(w, lang_id, file)))
+				except KeyError:
+					print(log('In word "{}" {} row have KeyError. Spotted when work with file "{}"'.format(w, lang_id, file)))
+				try:
+					if (lang and lang != '') and lang_data.get(lang_id, None) != lang:
+						row = reserved_write(row, ';{} in {}'.format(lang, file))
+						print(log('W: {} in word "{}" are not equals {} from file "{}"'.format(lang_id, w, lang_id, file)))
+					else:
+						if not re.match('w\/.*', lang_data.get('audio', '')):
+							if lang:
+								curr_lang = json.loads(lang)['1']
+								if re.match('w\/.*', curr_lang.get('audio', '')):
+									if os.path.isfile(curr_lang['audio']):
+										cursor.execute(
+											'UPDATE {} SET {}=%s WHERE idkey=%s;'.format(lang_id, import_config.words),
+											(lang, row[0],))
+										sql_client.commit()
+									else:
+										row = reserved_write(row, ';{} in {}'.format(curr_lang['audio'], file))
+										print(log('W: MP3 file not found for word "{}" from file "{}"'.format(w, file)))
+
+						elif import_config.test_file_path:
+							if not os.path.isfile(lang_data['audio']):
+								print(log('Audio file "{}" in word "{}" not found'.format(lang_data['audio'], w)))
+				except KeyError:
+					print(log('In word "{}" {} row have corrupted JSON in file "{}"'.format(w, lang_id, file)))
+		elif lang:
+			cursor.execute('UPDATE {} SET {}=%s WHERE idkey=%s;'.format(import_config.words, lang_id), (lang, row[0]))
+			sql_client.commit()
+
 	apostrophes = ['`', '"', '’', '´']
 	w = word.lower()
 	for el in apostrophes:
 		w = w.replace(el, "'")
 
-	us_lang = None
-	gb_lang = None
-
-	if check_contains(record, 'us'):
-		if 'us' in record.keys():
-			if 'audio' in record.keys():
-				if 'us' in record['audio'].keys():
-					us_lang = '{"1":{"us":"' + str(record['us']) + '","audio":' + str(
-						record['audio']) + '}}'
-			else:
-				us_lang = '{"1":{"us":"' + str(record['us']) + '"}}'
-		else:
-			us_lang = '{"1":{"audio":' + str(record['audio']) + '}}'
-			
-	if check_contains(record, 'gb'):
-		if 'gb' in record.keys():
-			if 'audio' in record.keys():
-				if 'gb' in record['audio'].keys():
-					gb_lang = '{"1":{"gb":"' + str(record['gb']) + '","audio":' + str(
-						record['audio']) + '}}'
-			else:
-				gb_lang = '{"1":{"gb":"' + str(record['gb']) + '"}}'
-		else:
-			gb_lang = '{"1":{"audio":' + str(record['audio']) + '}}'
+	us_lang = get_lang_data(record, 'us')
+	gb_lang = get_lang_data(record, 'gb')
 
 	origin_lang = re.search('.*v((ru|uk|pl))\.json$', file).group(1)
 	parent = record.get('awords', None)
@@ -81,6 +120,28 @@ def object_handler(record, file, word):
 						.format(import_config.words),
 						(w, parent, gb_lang, us_lang, file))
 		sql_client.commit()
+	else:
+		cursor.execute('SELECT * FROM {} WHERE word=%s;'.format(import_config.words), (w,))
+		row = cursor.fetchone()
+		if (row[3] is None or row[3] == '') and (parent and parent != ''):
+			reserved = row[6]
+			reserved += ';{} in {}'.format(parent, file)
+			cursor.execute('UPDATE {} SET parent=%s, reserved=%s WHERE idkey=%s;'.format(import_config.words),
+						(parent, reserved, row[0]))
+			sql_client.commit()
+			cursor.execute('SELECT * FROM {} WHERE word=%s;'.format(import_config.words), (w,))
+			row = cursor.fetchone()
+			print(log('W: Parent "{}" was added in word "{}" from file "{}"'.format(parent, w, file)))
+		elif row[3] != parent:
+			row = reserved_write(row, ';{} in {}'.format(parent, file))
+			print(log('W: Parent in word "{}" are not equals parent from file "{}"'.format(w, file)))
+
+		if check_contains(record, 'gb'):
+			lang_mod(row, 4, 'gb', gb_lang)
+			cursor.execute('SELECT * FROM {} WHERE word=%s;'.format(import_config.words), (w,))
+			row = cursor.fetchone()
+		if check_contains(record, 'us'):
+			lang_mod(row, 5, 'us', us_lang)
 
 	cursor.execute('SELECT idkey FROM {} WHERE word=%s;'.format(import_config.words), (w,))
 	id = cursor.fetchone()[0]

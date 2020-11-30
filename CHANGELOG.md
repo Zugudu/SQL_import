@@ -1,3 +1,9 @@
+## [1.3] 2020-11-30
+### Added
+   - Notified about error in DB
+   - Replacing url link to path to file if can
+   - Refactoring code 
+
 ## [1.2.2] 2020-11-28
 ### Added
   - Changelog
