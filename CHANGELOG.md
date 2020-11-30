@@ -1,3 +1,7 @@
+## [1.3.1] 2020-11-30
+### Fix
+   - JSON writing
+
 ## [1.3] 2020-11-30
 ### Added
    - Notified about error in DB

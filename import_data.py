@@ -1,4 +1,6 @@
 import mysql.connector
+from mysql.connector import DataError
+
 from dbconfig import DB
 
 from sys import stdout
@@ -36,18 +38,18 @@ def log(data):
 
 def object_handler(record, file, word):
 	def get_lang_data(row, lang):
-		ret = None
+		a = None
 		if check_contains(row, lang):
 			if lang in row.keys():
 				if 'audio' in row.keys():
 					if lang in row['audio'].keys():
-						ret = '{"1":{"' + lang + '":"' + str(row[lang]) + '","audio":' + str(
-							row['audio']) + '}}'
+						a = {'1': {lang: str(row[lang]), 'audio': str(row['audio'])}}
 				else:
-					ret = '{"1":{"' + lang + '":"' + str(row[lang]) + '"}}'
+					a = {'1': {lang: str(row[lang])}}
 			else:
-				ret = '{"1":{"audio":' + str(row['audio']) + '}}'
-		return ret
+				a = {'1': {'audio': str(row['audio'])}}
+			a = json.dumps(a)
+		return a
 
 	def reserved_write(row, mes):
 		res = row[6]
@@ -199,6 +201,9 @@ if __name__ == '__main__':
 			except json.decoder.JSONDecodeError:
 				err_msg = 'W: File {} is corrupted'.format(file)
 				print(log(err_msg))
+			except DataError:
+				print('\n')
+				pass
 			except Exception as ex:
 				err_msg = 'E: Some unexceptional error in file {} - {}'.format(file, ex)
 				print(log(err_msg))
