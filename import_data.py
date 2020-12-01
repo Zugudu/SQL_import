@@ -43,11 +43,11 @@ def object_handler(record, file, word):
 			if lang in row.keys():
 				if 'audio' in row.keys():
 					if lang in row['audio'].keys():
-						a = {'1': {lang: str(row[lang]), 'audio': str(row['audio'])}}
+						a = {'1': {lang: row[lang], 'audio': row['audio']}}
 				else:
-					a = {'1': {lang: str(row[lang])}}
+					a = {'1': {lang: row[lang]}}
 			else:
-				a = {'1': {'audio': str(row['audio'])}}
+				a = {'1': {'audio': row['audio']}}
 			a = json.dumps(a)
 		return a
 
